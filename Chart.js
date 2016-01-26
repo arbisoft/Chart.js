@@ -3656,7 +3656,7 @@
 				//A little inefficient double looping, but better than the line
 				//lagging behind the point positions
 				helpers.each(dataset.points,function(point){
-					if (point.hasValue()){
+					if (point.hasValue() && point.value > 0){
 						point.draw();
 					}
 				});
