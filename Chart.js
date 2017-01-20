@@ -178,7 +178,12 @@
 			onAnimationProgress: function(){},
 
 			// Function - Will fire on animation completion.
-			onAnimationComplete: function(){}
+			onAnimationComplete: function(){},
+
+			// LT-1527 Fix
+			pointLabelSeperator: "*",
+
+			pointLabelLineHeight: 17
 
 		}
 	};
@@ -775,7 +780,8 @@
 		retinaScale = helpers.retinaScale = function(chart){
 			var ctx = chart.ctx,
 				width = chart.canvas.width,
-				height = chart.canvas.height;
+				// LT-1527 Fix
+				height = chart.canvas.height + 10;
 
 			if (window.devicePixelRatio) {
 				ctx.canvas.style.width = width + "px";
@@ -1805,7 +1811,13 @@
 			for (i=0;i<this.valuesCount;i++){
 				// 5px to space the text slightly out - similar to what we do in the draw function.
 				pointPosition = this.getPointPosition(i, largestPossibleRadius);
-				textWidth = this.ctx.measureText(template(this.templateString, { value: this.labels[i] })).width + 5;
+				//LT-1527 Fix
+				if(this.labels[i].indexOf(Chart.defaults.global.pointLabelSeperator) > -1) {
+					var labelContent = this.labels[i].split(Chart.defaults.global.pointLabelSeperator);
+					textWidth = labelContent.reduce(function (a, b) { return a.length > b.length ? a : b; }).length;
+				} else {
+					textWidth = this.ctx.measureText(template(this.templateString, { value: this.labels[i] })).width + 5;
+				}
 				if (i === 0 || i === this.valuesCount/2){
 					// If we're at index zero, or exactly the middle, we're at exactly the top/bottom
 					// of the radar chart, so text will be aligned centrally, so we'll half it and compare
@@ -1882,6 +1894,9 @@
 			};
 		},
 		draw: function(){
+			//LT-1527 Fix
+			var label = null;
+			function isEven(n) {return n == parseFloat(n) ? !(n % 2) : void 0;}
 			if (this.display){
 				var ctx = this.ctx;
 				each(this.yLabels, function(label, index){
@@ -1949,7 +1964,9 @@
 							ctx.closePath();
 						}
 						// Extra 3px out for some label spacing
-						var pointLabelPosition = this.getPointPosition(i, this.calculateCenterOffset(this.max) + 5);
+						//LT-1527 Fix
+						var isEvenPoints = isEven(this.valuesCount);
+						var pointLabelPosition = this.getPointPosition(i, this.calculateCenterOffset(this.max) + 15);
 						ctx.font = fontString(this.pointLabelFontSize,this.pointLabelFontStyle,this.pointLabelFontFamily);
 						ctx.fillStyle = this.pointLabelFontColor;
 
@@ -1977,8 +1994,51 @@
 							ctx.textBaseline = 'top';
 						}
 
-						ctx.fillText(this.labels[i], pointLabelPosition.x, pointLabelPosition.y);
-					}
+						//LT-1527 Fix
+						var topPointIndex = 0;
+						label = this.labels[i];
+						var multiLabelFix = function (label, pointLabelPosition) {
+							label = label.split(Chart.defaults.global.pointLabelSeperator);
+							for (var l = 0; l < label.length; l++) {
+								ctx.fillText(label[l], pointLabelPosition.x, pointLabelPosition.y + (l * Chart.defaults.global.pointLabelLineHeight));
+							}
+						};
+						if (isEvenPoints) {
+							var bottomPointIndex = (this.valuesCount / 2);
+							var beforeBottomPointIndex = bottomPointIndex - 1;
+							var afterBottomPointIndex = bottomPointIndex + 1;
+							if (bottomPointIndex == i) {
+								label = label.replace( /\*/g, ' ' );
+								ctx.fillText(label, pointLabelPosition.x, pointLabelPosition.y - 11)
+							} else if (topPointIndex == i) {
+								label = label.replace( /\*/g, ' ' );
+								ctx.fillText(label, pointLabelPosition.x, pointLabelPosition.y + 10);
+							}
+							else if(beforeBottomPointIndex == i || afterBottomPointIndex == i){
+								label = label.split(Chart.defaults.global.pointLabelSeperator);
+								for (var l = 0; l < label.length; l++) {
+									ctx.fillText(label[l], pointLabelPosition.x, pointLabelPosition.y - 15 + (l * Chart.defaults.global.pointLabelLineHeight));
+								}
+							}
+							else {
+								multiLabelFix(label, pointLabelPosition);
+							}
+						}
+						else {
+							//Odd labels will have two labels at bottom
+							var bottomPointIndex1 = Math.round((this.valuesCount / 2));
+							var bottomPointIndex2 = Math.round((this.valuesCount / 2) - 1);
+							if (bottomPointIndex1 == i || bottomPointIndex2 == i) {
+								label = label.replace( /\*/g, ' ' );
+								ctx.fillText(label, pointLabelPosition.x, pointLabelPosition.y + 0);
+							} else if (topPointIndex == i) {
+								label = label.replace( /\*/g, ' ' );
+								ctx.fillText(label, pointLabelPosition.x, pointLabelPosition.y + 10);
+							} else {
+								multiLabelFix(label, pointLabelPosition);
+							}
+						}
+                    }
 				}
 			}
 		}
@@ -3079,7 +3139,7 @@
 			helpers.each(this.segments,function(segment){
 				segment.save();
 			});
-			
+
 			this.reflow();
 			this.render();
 		},
