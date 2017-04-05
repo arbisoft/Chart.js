@@ -21,6 +21,7 @@
 	var Chart = function(context){
 		var chart = this;
 		this.canvas = context.canvas;
+		console.log('ChartJS from arbisoft repo');
 
 		this.ctx = context;
 
